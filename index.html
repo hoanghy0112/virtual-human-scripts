@@ -97,6 +97,7 @@
 
         let currentIframe = iframe1;
         let nextIframe = iframe2;
+        let isTransitioning = false; // Flag to prevent concurrent transitions
 
         // Base iframe URL
         const baseUrl = 'https://virtual-human.aivos.tech/virtual-human-frame/';
@@ -132,6 +133,12 @@
             const url = createIframeUrl(isIdle);
             console.log('Updating iframe URL:', url);
 
+            // Prevent concurrent transitions
+            if (isTransitioning) {
+                console.log('Transition already in progress, skipping');
+                return;
+            }
+
             // Check if this is the first load
             if (!currentIframe.src) {
                 // First load - no transition needed
@@ -151,12 +158,23 @@
                 return;
             }
 
+            // Set transition flag
+            isTransitioning = true;
+
+            // Clear any existing onload/onerror handlers on nextIframe
+            nextIframe.onload = null;
+            nextIframe.onerror = null;
+
             // Prepare next iframe with new URL
             nextIframe.src = url;
 
-            // Wait for new iframe to load before transitioning
-            nextIframe.onload = function () {
+            // Set up one-time load handler for this transition
+            const handleIframeLoad = function () {
                 console.log('New iframe loaded, starting transition');
+
+                // Remove this handler to prevent future triggers
+                nextIframe.onload = null;
+                nextIframe.onerror = null;
 
                 // Start transition
                 nextIframe.classList.add('active');
@@ -174,15 +192,29 @@
                     currentIframe = nextIframe;
                     nextIframe = temp;
 
+                    // Clear transition flag
+                    isTransitioning = false;
+
                     console.log('Iframe transition completed');
                 }, 500); // Match CSS transition duration
             };
 
-            // Handle iframe load error
-            nextIframe.onerror = function () {
+            const handleIframeError = function () {
                 console.error('Failed to load new iframe URL:', url);
+
+                // Remove handlers
+                nextIframe.onload = null;
+                nextIframe.onerror = null;
+
+                // Clear transition flag
+                isTransitioning = false;
+
                 showError('Failed to load virtual human interface');
             };
+
+            // Set up the handlers
+            nextIframe.onload = handleIframeLoad;
+            nextIframe.onerror = handleIframeError;
         }
 
         function connectWebSocket() {
