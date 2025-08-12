@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Human Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #virtualFrame {
+            width: 100%;
+            height: 100vh;
+            border: none;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            color: #333;
+            z-index: 1000;
+        }
+
+        .error {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ff4444;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading">Connecting to virtual human...</div>
+    <iframe id="virtualFrame" style="display: none;"
+        allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const botId = urlParams.get('botId');
+        const roomId = urlParams.get('roomId');
+
+        // Validate required parameters
+        if (!botId || !roomId) {
+            showError('Missing required parameters: botId and roomId');
+        }
+
+        // WebSocket connection
+        let ws = null;
+        const iframe = document.getElementById('virtualFrame');
+        const loading = document.getElementById('loading');
+
+        // Base iframe URL
+        const baseUrl = 'https://virtual-human.aivos.tech/virtual-human-frame/';
+        const defaultParams = {
+            virtualId: botId,
+            isDemo: 'TRUE',
+            isIdle: 'TRUE'
+        };
+
+        function createIframeUrl(includeIdle = true) {
+            const params = new URLSearchParams(defaultParams);
+            if (!includeIdle) {
+                params.delete('isIdle');
+            }
+            return `${baseUrl}?${params.toString()}`;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+
+            // Remove error after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
+
+        function updateIframe(isIdle = true) {
+            const url = createIframeUrl(isIdle);
+            console.log('Updating iframe URL:', url);
+            iframe.src = url;
+
+            // Show iframe and hide loading
+            iframe.style.display = 'block';
+            loading.style.display = 'none';
+        }
+
+        function connectWebSocket() {
+            const wsUrl = `ws://${window.location.host}`;
+            console.log('Connecting to WebSocket:', wsUrl);
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function () {
+                console.log('WebSocket connected');
+
+                // Join the room
+                const joinMessage = {
+                    type: 'join_room',
+                    roomId: roomId,
+                    userId: `viewer_${Date.now()}`
+                };
+
+                ws.send(JSON.stringify(joinMessage));
+                console.log('Joining room:', roomId);
+            };
+
+            ws.onmessage = function (event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message received:', data);
+
+                    switch (data.type) {
+                        case 'connected':
+                            console.log('Client ID assigned:', data.data.clientId);
+                            break;
+
+                        case 'joined_room':
+                            console.log('Successfully joined room:', data.data.roomId);
+                            // Initialize with idle state
+                            updateIframe(true);
+                            break;
+
+                        case 'room_message':
+                            handleRoomMessage(data.data);
+                            break;
+
+                        case 'error':
+                            console.error('WebSocket error:', data.data.message);
+                            showError(`WebSocket error: ${data.data.message}`);
+                            break;
+
+                        default:
+                            console.log('Unknown message type:', data.type);
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            ws.onclose = function () {
+                console.log('WebSocket disconnected');
+                showError('Connection lost. Attempting to reconnect...');
+
+                // Attempt to reconnect after 3 seconds
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CLOSED) {
+                        connectWebSocket();
+                    }
+                }, 3000);
+            };
+
+            ws.onerror = function (error) {
+                console.error('WebSocket error:', error);
+                showError('Failed to connect to server');
+            };
+        }
+
+        function handleRoomMessage(messageData) {
+            const { message, userId, timestamp } = messageData;
+            console.log(`Message from ${userId}:`, message);
+
+            switch (message.toLowerCase()) {
+                case 'start':
+                    console.log('Received START command - activating virtual human');
+                    updateIframe(false); // Remove isIdle parameter
+                    break;
+
+                case 'end':
+                    console.log('Received END command - setting virtual human to idle');
+                    updateIframe(true); // Include isIdle parameter
+                    break;
+
+                default:
+                    console.log('Unknown command:', message);
+            }
+        }
+
+        // Initialize connection
+        if (botId && roomId) {
+            connectWebSocket();
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function () {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+
+</html>

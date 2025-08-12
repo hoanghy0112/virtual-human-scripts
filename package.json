@@ -1,0 +1,24 @@
+{
+  "name": "virtual-human-scripts",
+  "version": "1.0.0",
+  "description": "WebSocket server with room functionality",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "websocket",
+    "rooms",
+    "real-time"
+  ],
+  "author": "",
+  "license": "MIT"
+}
