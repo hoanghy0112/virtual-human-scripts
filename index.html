@@ -18,10 +18,29 @@
             overflow: hidden;
         }
 
-        #virtualFrame {
+        .iframe-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .virtual-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100vh;
             border: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .virtual-frame.active {
+            opacity: 1;
+        }
+
+        .virtual-frame.hidden {
+            opacity: 0;
         }
 
         .loading {
@@ -51,8 +70,12 @@
 
 <body>
     <div id="loading" class="loading">Connecting to virtual human...</div>
-    <iframe id="virtualFrame" style="display: none;"
-        allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+    <div class="iframe-container" style="display: none;">
+        <iframe id="virtualFrame1" class="virtual-frame" 
+                allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+        <iframe id="virtualFrame2" class="virtual-frame" 
+                allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+    </div>
 
     <script>
         // Get URL parameters
@@ -67,8 +90,13 @@
 
         // WebSocket connection
         let ws = null;
-        const iframe = document.getElementById('virtualFrame');
+        const iframe1 = document.getElementById('virtualFrame1');
+        const iframe2 = document.getElementById('virtualFrame2');
+        const iframeContainer = document.querySelector('.iframe-container');
         const loading = document.getElementById('loading');
+        
+        let currentIframe = iframe1;
+        let nextIframe = iframe2;
 
         // Base iframe URL
         const baseUrl = 'https://virtual-human.aivos.tech/virtual-human-frame/';
@@ -103,11 +131,58 @@
         function updateIframe(isIdle = true) {
             const url = createIframeUrl(isIdle);
             console.log('Updating iframe URL:', url);
-            iframe.src = url;
-
-            // Show iframe and hide loading
-            iframe.style.display = 'block';
-            loading.style.display = 'none';
+            
+            // Check if this is the first load
+            if (!currentIframe.src) {
+                // First load - no transition needed
+                currentIframe.src = url;
+                currentIframe.classList.add('active');
+                
+                // Show iframe container and hide loading
+                iframeContainer.style.display = 'block';
+                loading.style.display = 'none';
+                
+                return;
+            }
+            
+            // Check if URL is the same - no need to transition
+            if (currentIframe.src === url) {
+                console.log('URL unchanged, skipping transition');
+                return;
+            }
+            
+            // Prepare next iframe with new URL
+            nextIframe.src = url;
+            
+            // Wait for new iframe to load before transitioning
+            nextIframe.onload = function() {
+                console.log('New iframe loaded, starting transition');
+                
+                // Start transition
+                nextIframe.classList.add('active');
+                currentIframe.classList.remove('active');
+                currentIframe.classList.add('hidden');
+                
+                // After transition completes, swap iframes
+                setTimeout(() => {
+                    // Reset the old iframe
+                    currentIframe.classList.remove('hidden');
+                    currentIframe.src = '';
+                    
+                    // Swap references
+                    const temp = currentIframe;
+                    currentIframe = nextIframe;
+                    nextIframe = temp;
+                    
+                    console.log('Iframe transition completed');
+                }, 500); // Match CSS transition duration
+            };
+            
+            // Handle iframe load error
+            nextIframe.onerror = function() {
+                console.error('Failed to load new iframe URL:', url);
+                showError('Failed to load virtual human interface');
+            };
         }
 
         function connectWebSocket() {
