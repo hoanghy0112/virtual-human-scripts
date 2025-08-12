@@ -71,10 +71,10 @@
 <body>
     <div id="loading" class="loading">Connecting to virtual human...</div>
     <div class="iframe-container" style="display: none;">
-        <iframe id="virtualFrame1" class="virtual-frame" 
-                allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
-        <iframe id="virtualFrame2" class="virtual-frame" 
-                allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+        <iframe id="virtualFrame1" class="virtual-frame"
+            allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
+        <iframe id="virtualFrame2" class="virtual-frame"
+            allow="microphone; camera; autoplay; encrypted-media; fullscreen"></iframe>
     </div>
 
     <script>
@@ -94,7 +94,7 @@
         const iframe2 = document.getElementById('virtualFrame2');
         const iframeContainer = document.querySelector('.iframe-container');
         const loading = document.getElementById('loading');
-        
+
         let currentIframe = iframe1;
         let nextIframe = iframe2;
 
@@ -131,62 +131,64 @@
         function updateIframe(isIdle = true) {
             const url = createIframeUrl(isIdle);
             console.log('Updating iframe URL:', url);
-            
+
             // Check if this is the first load
             if (!currentIframe.src) {
                 // First load - no transition needed
                 currentIframe.src = url;
                 currentIframe.classList.add('active');
-                
+
                 // Show iframe container and hide loading
                 iframeContainer.style.display = 'block';
                 loading.style.display = 'none';
-                
+
                 return;
             }
-            
+
             // Check if URL is the same - no need to transition
             if (currentIframe.src === url) {
                 console.log('URL unchanged, skipping transition');
                 return;
             }
-            
+
             // Prepare next iframe with new URL
             nextIframe.src = url;
-            
+
             // Wait for new iframe to load before transitioning
-            nextIframe.onload = function() {
+            nextIframe.onload = function () {
                 console.log('New iframe loaded, starting transition');
-                
+
                 // Start transition
                 nextIframe.classList.add('active');
                 currentIframe.classList.remove('active');
                 currentIframe.classList.add('hidden');
-                
+
                 // After transition completes, swap iframes
                 setTimeout(() => {
                     // Reset the old iframe
                     currentIframe.classList.remove('hidden');
                     currentIframe.src = '';
-                    
+
                     // Swap references
                     const temp = currentIframe;
                     currentIframe = nextIframe;
                     nextIframe = temp;
-                    
+
                     console.log('Iframe transition completed');
                 }, 500); // Match CSS transition duration
             };
-            
+
             // Handle iframe load error
-            nextIframe.onerror = function() {
+            nextIframe.onerror = function () {
                 console.error('Failed to load new iframe URL:', url);
                 showError('Failed to load virtual human interface');
             };
         }
 
         function connectWebSocket() {
-            const wsUrl = `ws://${window.location.host}`;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+            const wsUrl = `${protocol}//${window.location.host}`;
             console.log('Connecting to WebSocket:', wsUrl);
 
             ws = new WebSocket(wsUrl);
